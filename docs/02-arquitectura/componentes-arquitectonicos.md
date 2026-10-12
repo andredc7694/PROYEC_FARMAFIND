@@ -1,6 +1,6 @@
 # Componentes arquitectónicos del sistema FarmaFind
 
-![Componentes arquitectónicos de FarmaFind](../../img/componentes-arquitectonicos-farmafind.png)
+![Componentes arquitectónicos de FarmaFind](../../img/enfoque-arquitectonico-farmafind.png)
 
 ## Resumen de componentes
 
