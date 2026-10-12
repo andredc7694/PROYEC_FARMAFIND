@@ -1,0 +1,10 @@
+# Decisiones arquitectónicas
+
+| ID | Título | Drivers relacionados | Decisión arquitectónica | Justificación | Resultado |
+|---|---|---|---|---|---|
+| ADR-01 | Monolito modular inicial | DA06, DA07 | Usar un monolito modular inicial. | Reduce el costo operativo y mantiene la consistencia del núcleo del sistema. | Usuarios, Farmacias, Medicamentos, Búsqueda, Inventario y Reservas estarán en un backend modular. Notificaciones se manejará como servicio separado para cumplir el laboratorio. |
+| ADR-02 | Organización por capas | DA06 | Organizar el sistema en capas lógicas. | Permite separar la presentación, la lógica de negocio y la persistencia de datos. | El sistema tendrá una estructura clara entre controladores, casos de uso, dominio e infraestructura. |
+| ADR-03 | Clean Architecture | DA05, DA06 | Aplicar Clean Architecture. | Protege la lógica de negocio frente a cambios en frameworks, base de datos o servicios externos. | El dominio y la aplicación quedarán internos; los controladores, base de datos y servicios externos estarán en infraestructura. |
+| ADR-04 | PostgreSQL transaccional | DA01, DA02 | Usar PostgreSQL con transacciones. | Permite controlar correctamente el stock y las reservas cuando existen solicitudes concurrentes. | Las reservas e inventario se manejarán con transacciones, restricciones y repositorios. |
+| ADR-05 | Puertos y adaptadores | DA05 | Usar interfaces y adaptadores para servicios externos. | Facilita cambiar o simular servicios como notificaciones, pagos, mapas o inventario externo. | Se crearán puertos para notificación, pago e inventario externo; los proveedores concretos podrán cambiar sin afectar el núcleo. |
+| ADR-06 | Seguridad por rol y recurso | DA04 | Aplicar autenticación y autorización por rol y recurso. | Un usuario no debe acceder a reservas o farmacias que no le corresponden. | Las búsquedas serán públicas, pero las operaciones sensibles requerirán autenticación, permisos y validación en el backend. |
