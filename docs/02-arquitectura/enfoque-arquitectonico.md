@@ -1,6 +1,6 @@
 # Enfoque arquitectónico del sistema FarmaFind
 
-![Enfoque arquitectónico Clean Architecture de FarmaFind](assets/enfoque-arquitectonico-farmafind.png)
+![Enfoque arquitectónico Clean Architecture de FarmaFind](../../img/enfoque-arquitectonico-farmafind.png)
 
 ## Resumen del enfoque
 
