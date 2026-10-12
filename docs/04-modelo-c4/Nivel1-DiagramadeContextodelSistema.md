@@ -22,7 +22,7 @@ Mostrar a **FarmaFind como una sola caja**: quiénes lo usan y con qué sistemas
 
 ![Diagrama de contexto de FarmaFind](../../img/nivel1-contexto-farmafind.png)
 
-> Archivo editable: `img/fuentes/nivel1-contexto-farmafind.drawio`
+> Archivo editable: `img/fuentes/nivel1-contexto-farmafind.png`
 
 ---
 

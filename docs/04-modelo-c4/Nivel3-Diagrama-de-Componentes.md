@@ -23,7 +23,7 @@ Abrir el contenedor **API FarmaFind** del nivel 2 y mostrar sus **componentes**:
 
 ![Diagrama de componentes de la API FarmaFind](../../img/nivel3-componentes-api-farmafind.png)
 
-> Archivo editable: `img/fuentes/nivel3-componentes-farmafind.drawio`
+> Archivo editable: `img/fuentes/nivel3-componentes-farmafind.png`
 
 ---
 

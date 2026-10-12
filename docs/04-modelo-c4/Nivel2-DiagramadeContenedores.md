@@ -23,7 +23,7 @@ Abrir la caja «FarmaFind» del nivel 1 y mostrar los **contenedores** que forma
 
 ![Diagrama de contenedores de FarmaFind](../../img/nivel2-contenedores-farmafind.png)
 
-> Archivo editable: `img/fuentes/nivel2-contenedores-farmafind.drawio`
+> Archivo editable: `img/fuentes/nivel2-contenedores-farmafind.png`
 
 ---
 
