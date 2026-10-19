@@ -6,12 +6,12 @@
 |---|---|
 | Atributo de calidad | Rendimiento |
 | Fuente | Cliente |
-| Estímulo | El cliente busca medicamentos por nombre comercial o principio activo. |
-| Condición | El sistema funciona con la carga definida y datos representativos. |
-| Respuesta esperada | El sistema muestra las farmacias con disponibilidad, precio y ubicación sin errores inesperados. |
-| Medida | El 95 % de las búsquedas debe responder en 2 segundos o menos, con errores técnicos menores al 1 %. |
-| Verificación | Ejecutar pruebas de carga y registrar p95, p99, throughput, errores y uso de recursos. |
-| Estado | Pendiente de validación durante las pruebas del proyecto. |
+| Estímulo | El cliente realiza una búsqueda de medicamentos por nombre comercial o principio activo, aplicando opcionalmente filtros de disponibilidad, precio o cercanía. |
+| Condición | El sistema funciona bajo una carga de prueba definida, con un conjunto de datos representativo y Redis disponible como contenedor obligatorio del MVP. El módulo Búsqueda utiliza Cache-Aside para consultar primero Redis y recurrir a PostgreSQL cuando no existe una entrada válida. |
+| Respuesta esperada | El sistema muestra medicamentos y farmacias con disponibilidad, precio referencial y ubicación sin errores inesperados. Las consultas repetidas pueden resolverse mediante Redis, reduciendo accesos innecesarios a PostgreSQL. Los resultados almacenados en caché deben respetar las políticas de TTL e invalidación. |
+| Medida | El 95 % de las búsquedas debe responder en 2 segundos o menos (p95 ≤ 2 s), con errores técnicos menores al 1 %. Se medirán también p99, throughput, latencia de Redis, porcentaje de aciertos y fallos de caché (hit rate y miss rate), consultas a PostgreSQL, CPU, memoria y conexiones. Se comparará el rendimiento con caché habilitada y deshabilitada bajo condiciones equivalentes. |
+| Verificación | Ejecutar pruebas de carga sobre búsquedas repetidas y variadas, utilizando el mismo conjunto de datos, recursos y carga para las comparaciones. Registrar p95, p99, throughput, errores, hit rate, miss rate y cantidad de consultas a PostgreSQL. Comprobar el comportamiento de Cache-Aside ante aciertos y fallos de caché. |
+| Estado | Pendiente de implementación y validación mediante pruebas de rendimiento. |
 
 ## EQ-02. Disponibilidad: continuidad del servicio
 
@@ -19,12 +19,12 @@
 |---|---|
 | Atributo de calidad | Disponibilidad |
 | Fuente | Usuario del sistema |
-| Estímulo | Una instancia del núcleo deja de funcionar. |
-| Condición | El sistema cuenta con dos instancias del núcleo en ejecución. |
-| Respuesta esperada | El servicio continúa funcionando mediante la instancia sana. |
-| Medida | El servicio debe reanudarse en 30 segundos o menos. |
-| Verificación | Detener una instancia y comprobar que la otra atiende las solicitudes. |
-| Estado | La base de datos única queda declarada como punto de fallo. |
+| Estímulo | Una instancia del núcleo FarmaFind deja de funcionar o Redis presenta una interrupción temporal. |
+| Condición | El sistema cuenta con dos instancias del núcleo en ejecución, PostgreSQL disponible y Redis configurado como caché. Se realizan pruebas controladas de interrupción de una instancia y de Redis por separado, manteniendo disponibles los demás componentes necesarios. |
+| Respuesta esperada | Si una instancia de la API falla, la instancia sana debe continuar atendiendo solicitudes. Si Redis falla, el módulo Búsqueda debe utilizar PostgreSQL como alternativa, sin impedir consultas ni operaciones de reserva. La información transaccional no debe depender de Redis. |
+| Medida | Ante la caída de una instancia del núcleo, las solicitudes deberán volver a ser atendidas por la instancia sana en 30 segundos o menos. Durante la interrupción de Redis, las búsquedas deberán continuar mediante PostgreSQL, sin fallos funcionales atribuibles exclusivamente a la indisponibilidad de caché. Se registrarán tiempos de recuperación, errores y degradación del rendimiento. |
+| Verificación | Ejecutar dos pruebas separadas: detener una instancia de la API y comprobar la continuidad mediante la otra; detener Redis y comprobar que las búsquedas recurren a PostgreSQL. Verificar que las reservas continúan validando stock mediante operaciones transaccionales. Registrar tiempos, respuestas y errores. |
+| Estado | Pendiente de pruebas de disponibilidad y tolerancia a fallos. PostgreSQL único permanece declarado como punto potencial de fallo. |
 
 ## EQ-03. Escalabilidad: aumento de carga
 
@@ -32,12 +32,12 @@
 |---|---|
 | Atributo de calidad | Escalabilidad |
 | Fuente | Crecimiento de usuarios |
-| Estímulo | Aumenta la cantidad de búsquedas y reservas en el sistema. |
-| Condición | Se comparan una y dos instancias con el mismo conjunto de datos y recursos de base de datos. |
-| Respuesta esperada | El sistema debe aumentar su capacidad antes de superar los límites de rendimiento definidos. |
-| Medida | Comparar capacidad, latencia y errores antes de superar el escenario EQ-01. |
-| Verificación | Ejecutar pruebas con carga creciente y documentar el cuello de botella. |
-| Estado | Pendiente de validación con pruebas de carga. |
+| Estímulo | Aumenta progresivamente la cantidad de usuarios que realizan búsquedas y reservas en FarmaFind. |
+| Condición | Se comparan una y dos instancias de la API utilizando el mismo conjunto de datos y recursos equivalentes de PostgreSQL y Redis. Las pruebas incluirán consultas repetidas y variadas para evaluar el efecto de Cache-Aside, así como operaciones de reserva sobre inventario compartido. |
+| Respuesta esperada | El sistema deberá admitir un incremento de carga sin superar inmediatamente los límites de rendimiento definidos en EQ-01. Redis deberá contribuir a reducir consultas repetidas a PostgreSQL, mientras que las operaciones de reserva deberán mantener consistencia independientemente del número de instancias de la API. |
+| Medida | Comparar el throughput máximo alcanzado antes de superar p95 ≤ 2 s y errores técnicos menores al 1 % en las búsquedas. Registrar p95, p99, CPU, memoria, conexiones a PostgreSQL, hit rate, miss rate, consumo de recursos Redis y cuellos de botella. Medir por separado el comportamiento de las reservas concurrentes. |
+| Verificación | Ejecutar pruebas con carga creciente sobre una y dos instancias. Mantener un conjunto de datos y recursos comparables. Comparar resultados con Redis habilitado y deshabilitado para analizar su contribución al rendimiento. Documentar los límites encontrados y cualquier mejora que no pueda demostrarse. |
+| Estado | Pendiente de validación mediante pruebas de carga y escalabilidad. No se presupone una mejora cuantitativa sin mediciones. |
 
 ## EQ-04. Seguridad: acceso protegido
 
@@ -45,12 +45,12 @@
 |---|---|
 | Atributo de calidad | Seguridad |
 | Fuente | Usuario autenticado o no autorizado |
-| Estímulo | Un usuario intenta acceder a reservas ajenas o administrar otra farmacia. |
-| Condición | El sistema tiene usuarios con roles y permisos definidos. |
-| Respuesta esperada | El sistema rechaza el acceso no autorizado. |
-| Medida | El 100 % de intentos no autorizados debe ser rechazado. |
-| Verificación | Probar accesos indebidos a reservas, farmacias y funciones administrativas. |
-| Estado | Pendiente de pruebas de autorización y revisión de logs. |
+| Estímulo | Un usuario intenta acceder a reservas ajenas, modificar inventario de otra farmacia o acceder directamente a componentes de infraestructura sin autorización. |
+| Condición | FarmaFind dispone de usuarios con roles y permisos definidos. Las operaciones protegidas requieren autenticación y autorización por recurso. PostgreSQL y Redis se encuentran restringidos a componentes autorizados del backend. |
+| Respuesta esperada | El sistema rechaza los accesos no autorizados a reservas y funciones administrativas. La identidad del cliente utilizada en una reserva proviene del contexto autenticado. Redis no es accesible directamente desde el navegador y no almacena contraseñas, tokens ni información privada innecesaria en la caché de búsquedas públicas. |
+| Medida | El 100 % de los intentos no autorizados incluidos en las pruebas definidas deberá ser rechazado. Ninguna prueba deberá demostrar exposición de contraseñas, tokens, credenciales de PostgreSQL o Redis en respuestas o registros técnicos. Los accesos directos no autorizados a Redis deberán ser rechazados. |
+| Verificación | Probar accesos a reservas ajenas, operaciones sobre otras farmacias, manipulación de identificadores enviados por el navegador y accesos no autorizados a Redis. Revisar los mecanismos de autenticación, autorización, configuración de red y registros técnicos. |
+| Estado | Pendiente de implementación y pruebas de seguridad. |
 
 ## EQ-05. Consistencia: reservas concurrentes
 
@@ -58,12 +58,12 @@
 |---|---|
 | Atributo de calidad | Consistencia |
 | Fuente | Clientes concurrentes |
-| Estímulo | Varios clientes intentan reservar el mismo medicamento al mismo tiempo. |
-| Condición | Existen 10 unidades disponibles y se realizan 100 intentos simultáneos de reserva. |
-| Respuesta esperada | El sistema acepta solo las reservas que correspondan al stock real. |
-| Medida | Deben aceptarse exactamente 10 reservas distintas, sin stock negativo ni duplicados. |
-| Verificación | Ejecutar prueba concurrente sobre una unidad limitada de inventario. |
-| Estado | Pendiente de validación con transacciones de base de datos. |
+| Estímulo | Varios clientes intentan reservar simultáneamente unidades de un mismo medicamento en una farmacia. |
+| Condición | Existen 10 unidades disponibles y se realizan 100 intentos simultáneos, válidos e independientes, solicitando una unidad cada uno. PostgreSQL es la fuente oficial de inventario y reservas. Redis podrá contener resultados referenciales de búsqueda, pero no participará en la confirmación del stock. |
+| Respuesta esperada | El sistema deberá aceptar únicamente las reservas correspondientes al stock disponible. El compromiso de stock, el registro de la reserva con estado PENDIENTE y el evento Outbox deberán ejecutarse dentro de una misma transacción PostgreSQL mediante Unit of Work. Las operaciones fallidas deberán revertirse. |
+| Medida | Deberán confirmarse exactamente 10 reservas distintas, sin stock negativo, duplicación de reservas exitosas ni compromiso superior a las existencias. El inventario deberá quedar con 10 unidades comprometidas y 0 unidades disponibles, suponiendo que no existan otras operaciones concurrentes de inventario ni vencimientos durante la prueba. |
+| Verificación | Ejecutar 100 solicitudes concurrentes válidas e independientes sobre el mismo registro de inventario. Verificar las respuestas, la cantidad de reservas persistidas, el stock físico, el stock comprometido y la cantidad de eventos Outbox. Repetir pruebas de cancelación, expiración y entrega para confirmar que el stock se libere o consuma una sola vez. |
+| Estado | Pendiente de implementación y validación mediante pruebas de concurrencia y transacciones PostgreSQL. |
 
 ## EQ-06. Mantenibilidad: cambio de adaptador
 
@@ -71,12 +71,12 @@
 |---|---|
 | Atributo de calidad | Mantenibilidad |
 | Fuente | Equipo de desarrollo |
-| Estímulo | Se reemplaza el adaptador de notificaciones por uno simulado. |
-| Condición | El dominio y los casos de uso ya están definidos. |
-| Respuesta esperada | El cambio se realiza sin modificar dominio ni casos de uso. |
-| Medida | El reemplazo debe afectar solo la infraestructura o adaptador correspondiente. |
-| Verificación | Sustituir el adaptador y ejecutar pruebas de los componentes relacionados. |
-| Estado | Pendiente de implementación y pruebas. |
+| Estímulo | Se necesita reemplazar el adaptador Redis del módulo Búsqueda o sustituir el adaptador de integración con Notificaciones por una implementación simulada. |
+| Condición | Los módulos utilizan Clean Architecture, contratos internos e inyección de dependencias. Búsqueda depende de `BusquedaCachePort` y Reservas utiliza contratos para registrar eventos de notificación. Las implementaciones concretas se encuentran en infraestructura. |
+| Respuesta esperada | El adaptador Redis podrá sustituirse por uno simulado o por una implementación sin caché sin modificar las entidades de dominio ni los contratos de los casos de uso. De manera equivalente, la integración con Notificaciones podrá sustituirse por una implementación simulada sin alterar las reglas de Reservas. |
+| Medida | La sustitución de cada adaptador deberá realizarse sin modificar el dominio ni los casos de uso relacionados. Las pruebas existentes deberán continuar ejecutándose correctamente. Se registrarán los archivos modificados y cualquier cambio necesario en composición o configuración. |
+| Verificación | Sustituir `RedisBusquedaCacheAdapter` por un adaptador simulado y ejecutar las pruebas de Búsqueda. Repetir el ejercicio con el adaptador de registro de notificaciones. Comprobar que las modificaciones se limitan a infraestructura, composición y configuración, sin cambios en las reglas de negocio. |
+| Estado | Pendiente de implementación y validación mediante pruebas de mantenibilidad. |
 
 ## EQ-07. Interoperabilidad: contrato con notificaciones
 
@@ -84,25 +84,25 @@
 |---|---|
 | Atributo de calidad | Interoperabilidad |
 | Fuente | Núcleo FarmaFind |
-| Estímulo | El núcleo envía un evento al servicio de Notificaciones. |
-| Condición | Existe un contrato definido entre el núcleo y el servicio de Notificaciones. |
-| Respuesta esperada | El servicio consumidor registra un único trabajo por identificador. |
-| Medida | Si se repite el evento, no debe generarse un trabajo duplicado. |
-| Verificación | Validar el contrato y repetir un evento con el mismo identificador. |
-| Estado | Pendiente de validación del contrato. |
+| Estímulo | El publicador Outbox envía al servicio independiente de Notificaciones un evento generado por una reserva. El mismo evento puede enviarse nuevamente debido a un reintento. |
+| Condición | Existe un contrato de eventos definido entre el núcleo y el servicio de Notificaciones. La comunicación utiliza HTTPS/REST interno autenticado. Cada evento contiene un identificador único, tipo de evento, identificador de reserva y datos necesarios para su procesamiento. El servicio consumidor dispone de persistencia para registrar eventos recibidos. |
+| Respuesta esperada | El servicio de Notificaciones valida el evento, registra un único trabajo lógico por identificador y reconoce correctamente los reintentos del mismo evento. El publicador podrá marcar el evento Outbox como publicado después de recibir una confirmación válida. Redis no participa en este proceso. |
+| Medida | Al enviar repetidamente un evento con el mismo identificador, deberá existir un único trabajo lógico persistido. Los eventos válidos deberán cumplir el contrato definido y las solicitudes no autorizadas o inválidas deberán rechazarse. La deduplicación de trabajos no se considerará una garantía absoluta de entrega única por parte de proveedores externos. |
+| Verificación | Validar el contrato de eventos y la autenticación entre servicios. Enviar el mismo evento varias veces y comprobar que se registre un solo trabajo lógico. Simular una interrupción después de que el consumidor registre el evento y antes de que el publicador reciba la confirmación, y comprobar la deduplicación durante el reintento. |
+| Estado | Pendiente de definición final del contrato y pruebas de interoperabilidad e idempotencia. |
 
-## EQ-08. Resiliencia: falla de notificaciones
+## EQ-08. Resiliencia: falla de notificaciones y caché
 
 | Elemento | Descripción |
 |---|---|
 | Atributo de calidad | Resiliencia |
-| Fuente | Falla temporal del servicio de Notificaciones |
-| Estímulo | El servicio de Notificaciones se interrumpe durante 5 minutos. |
-| Condición | El núcleo de reservas continúa funcionando. |
-| Respuesta esperada | Las reservas continúan y los avisos pendientes quedan persistidos. |
-| Medida | Al recuperar Notificaciones, los trabajos pendientes deben procesarse sin pérdida. |
-| Verificación | Interrumpir Notificaciones, generar reservas y medir el retraso al recuperar el servicio. |
-| Estado | Pendiente de prueba de recuperación. |
+| Fuente | Falla temporal del servicio de Notificaciones o de Redis |
+| Estímulo | El servicio independiente de Notificaciones se interrumpe durante 5 minutos o Redis deja temporalmente de responder solicitudes. |
+| Condición | El núcleo FarmaFind y PostgreSQL permanecen disponibles. Las reservas utilizan Transactional Outbox para almacenar eventos pendientes. El módulo Búsqueda utiliza Cache-Aside con Redis y dispone de una ruta alternativa de consulta a PostgreSQL. Las pruebas de ambas interrupciones se ejecutan por separado para identificar sus efectos. |
+| Respuesta esperada | Durante la interrupción de Notificaciones, las reservas deberán continuar y los eventos pendientes permanecerán registrados en PostgreSQL. Tras recuperar el servicio, los eventos deberán procesarse mediante reintentos y deduplicación. Durante la interrupción de Redis, las búsquedas deberán continuar consultando PostgreSQL, y las reservas no deberán verse afectadas funcionalmente por la caída de caché. |
+| Medida | Después de interrumpir Notificaciones durante 5 minutos, todos los eventos correspondientes a transacciones confirmadas deberán permanecer registrados y ser procesables tras la recuperación, sin pérdida de trabajos lógicos. Se medirá el retraso de procesamiento. Ante el fallo de Redis, las búsquedas deberán continuar mediante PostgreSQL y se medirán errores, latencia y tiempo de utilización del mecanismo alternativo. |
+| Verificación | Detener Notificaciones durante 5 minutos, generar reservas y verificar los eventos pendientes en Outbox. Restaurar el servicio y comprobar su procesamiento, los reintentos y la ausencia de trabajos lógicos duplicados. En una prueba independiente, detener Redis, ejecutar búsquedas, verificar el acceso alternativo a PostgreSQL y comprobar la recuperación posterior de la caché. Validar también el TTL y la invalidación de resultados después de cambios confirmados en los datos. |
+| Estado | Pendiente de implementación y pruebas de recuperación ante fallos de Notificaciones y Redis. |
 
 ## EQ-09. Observabilidad: seguimiento de pruebas
 
@@ -110,9 +110,9 @@
 |---|---|
 | Atributo de calidad | Observabilidad y pruebas |
 | Fuente | Equipo de desarrollo y pruebas |
-| Estímulo | Se ejecutan pruebas de reservas, búsquedas y notificaciones. |
-| Condición | El sistema cuenta con logs, métricas y correlación de eventos. |
-| Respuesta esperada | Cada reserva de prueba puede relacionarse con registros y métricas del sistema. |
-| Medida | Registrar latencia, errores, CPU, memoria, conexiones y trabajos pendientes. |
-| Verificación | Revisar logs y métricas después de cada prueba definida por criterios de aceptación. |
-| Estado | Pendiente de configuración de observabilidad. |
+| Estímulo | Se ejecutan pruebas de búsquedas, reservas concurrentes, uso de Redis, fallos de caché, publicación de eventos y recuperación del servicio de Notificaciones. |
+| Condición | El sistema dispone de registros estructurados, identificadores de correlación y mecanismos para recopilar métricas del backend, PostgreSQL, Redis y procesamiento de eventos. Las pruebas utilizan conjuntos de datos y cargas reproducibles. |
+| Respuesta esperada | Cada reserva de prueba podrá relacionarse con registros y eventos correspondientes. Las consultas permitirán identificar si fueron atendidas mediante Redis o PostgreSQL. Los fallos de transacciones, errores de conexión, eventos pendientes y reintentos deberán poder identificarse mediante registros y métricas, sin exponer información sensible. |
+| Medida | Registrar p95, p99, throughput, errores técnicos, conflictos de stock, CPU, memoria, conexiones a PostgreSQL, transacciones fallidas y eventos Outbox pendientes. Para Redis, medir hit rate, miss rate, latencia, uso de memoria, errores de conexión, invalidaciones y utilización del mecanismo alternativo. Para Notificaciones, registrar eventos publicados, trabajos pendientes, reintentos, errores y retrasos de procesamiento. |
+| Verificación | Ejecutar los escenarios EQ-01 a EQ-08 y revisar sus registros y métricas. Comprobar la correlación entre solicitudes, reservas y eventos. Comparar búsquedas con caché habilitada y deshabilitada. Verificar que los fallos de Redis y Notificaciones sean observables y que las evidencias obtenidas permitan evaluar los criterios de aceptación de cada escenario. |
+| Estado | Pendiente de configuración de observabilidad, implementación y validación mediante pruebas. |

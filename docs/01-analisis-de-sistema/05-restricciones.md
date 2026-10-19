@@ -1,14 +1,16 @@
 # Restricciones del sistema FarmaFind
 
+
 | ID | Restricción | Aplicación en FarmaFind |
 |---|---|---|
-| RC01 | Aplicación web | Acceso mediante navegador; búsqueda pública sin cuenta obligatoria. |
-| RC02 | API REST | Contratos documentados con OpenAPI; errores y autorización consistentes. |
-| RC03 | Base relacional | PostgreSQL para las operaciones transaccionales del núcleo. |
-| RC04 | Control de versiones | Un repositorio Git con código, documentación y especificaciones del mismo proyecto. |
-| RC05 | Pago externo | Si se incorpora, se usará un proveedor externo sin almacenar datos sensibles de tarjetas. |
-| RC06 | Geolocalización | Mapas o rutas mediante un proveedor externo. Ante fallo, mostrar dirección textual; no bloquear reservas. |
-| RC07 | Inventario | Actualización manual en el MVP; puerto para futura API de inventario. Sin prometer sincronización automática todavía. |
-| RC08 | SDD con Spec Kit | Obligatoria por el prompt. Antes de cada incremento se elaborarán especificación, clarificaciones, plan y tareas; las pruebas se vincularán a criterios de aceptación. |
-| RC09 | Dos servicios | Obligatoria para el laboratorio 10 del sílabo. El núcleo y Notificaciones tendrán responsabilidades y procesos separados, con comunicación verificable. |
-| RC10 | Entrega reproducible | Docker y Compose, pipeline básico, observabilidad y evidencia de despliegue real o simulado según el alcance académico. |
+| RC01 | Aplicación web | El sistema utilizará una aplicación web desarrollada con React, accesible desde un navegador. Las búsquedas de medicamentos serán públicas, sin necesidad de iniciar sesión. |
+| RC02 | API REST | El backend utilizará Node.js, Express y TypeScript. Las API REST deberán contar con contratos documentados mediante OpenAPI, validación de datos, manejo consistente de errores y autorización en operaciones protegidas. |
+| RC03 | Base de datos relacional | PostgreSQL será la base de datos principal y la fuente oficial de información. Las operaciones críticas de Reservas e Inventario deberán utilizar transacciones y mecanismos de control de concurrencia para garantizar la consistencia. |
+| RC04 | Control de versiones | El proyecto utilizará Git y GitHub para mantener el código, la documentación, los diagramas y las especificaciones arquitectónicas dentro de un mismo repositorio. |
+| RC05 | Pago externo | Los pagos electrónicos serán opcionales y quedarán fuera del MVP. Si se incorporan posteriormente, se utilizará una pasarela externa sin almacenar datos sensibles de tarjetas en FarmaFind. |
+| RC06 | Geolocalización | La ubicación o distancia de las farmacias podrá consultarse mediante un proveedor externo de mapas. Si el servicio falla, el sistema deberá mostrar la dirección textual y permitir continuar con las búsquedas y reservas. |
+| RC07 | Inventario | La actualización del inventario será manual durante el MVP. El sistema deberá controlar el stock físico, comprometido y disponible. La integración automática con inventarios externos quedará prevista para futuras iteraciones. |
+| RC08 | SDD con Spec Kit | El proyecto seguirá el enfoque de desarrollo dirigido por especificaciones (SDD) utilizando Spec Kit, según los requisitos académicos. Cada incremento deberá considerar especificación, clarificaciones, planificación, tareas y pruebas vinculadas con criterios de aceptación. |
+| RC09 | Dos servicios independientes | Por requerimiento del laboratorio 10 del sílabo, FarmaFind deberá contar con dos servicios principales: el núcleo FarmaFind y el servicio independiente de Notificaciones. La comunicación utilizará eventos registrados mediante Transactional Outbox y publicados mediante HTTPS/REST interno autenticado. |
+| RC10 | Entrega reproducible | El proyecto deberá contemplar Docker y Docker Compose para desplegar los servicios y contenedores necesarios, incluyendo la API, Notificaciones, PostgreSQL y Redis. También deberá considerar un pipeline básico, observabilidad y evidencias de despliegue real o simulado según el alcance académico. |
+| RC11 | Redis obligatorio en el MVP | Redis será un contenedor obligatorio para almacenar temporalmente resultados de búsqueda mediante Cache-Aside. Deberá utilizar TTL configurable e invalidación de datos relevantes. PostgreSQL seguirá siendo la fuente oficial para confirmar reservas e inventario. Si Redis falla, las búsquedas deberán continuar consultando PostgreSQL. |
