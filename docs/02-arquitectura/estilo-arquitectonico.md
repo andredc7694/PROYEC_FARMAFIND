@@ -3,8 +3,6 @@
 
 ![Estilo arquitectónico de FarmaFind](../../img/estilo-arquitectonico-farmafind.png)
 
-> **Nota:** la imagen deberá actualizarse para representar el monolito modular, Clean Architecture, PostgreSQL, Redis y Notificaciones independiente, además de importación de Excel, conciliación de inventario y aceptación tras comprobación física.
-
 > **Estado:** diseño propuesto, pendiente de implementación y validación.
 
 ## Resumen del estilo arquitectónico

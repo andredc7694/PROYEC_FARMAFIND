@@ -330,9 +330,3 @@ Las futuras decisiones deberán mantener coherencia con:
 - Las transacciones compartidas de Reservas e Inventario.
 - Transactional Outbox para la publicación de eventos.
 - El servicio independiente de Notificaciones.
-
----
-
-> **Coherencia arquitectónica:** los patrones descritos corresponden a las decisiones ADR-01 a ADR-12 y a los diagramas C4 Nivel 2 y Nivel 3, versión 1.2. El tratamiento transaccional de reservas y el registro de eventos mantienen correspondencia con el C4 Nivel 4 y el diseño interno de módulos, versión 1.1.
-
-> **Estado del documento:** este archivo presenta patrones seleccionados para el diseño de FarmaFind. Su aplicación práctica deberá implementarse y validarse posteriormente.

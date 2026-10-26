@@ -239,7 +239,3 @@ El identificador de la reserva, el registro de inventario y el evento pendiente 
 | `../01-analisis-de-sistema/04-atributos-de-calidad.md` | Establece los atributos de consistencia, seguridad y resiliencia |
 | `../01-analisis-de-sistema/07-decisiones-arquitectonicas.md` | Contiene las decisiones arquitectónicas que justifican el diseño |
 | `../01-analisis-de-sistema/08-escenarios-atributos-calidad.md` | Establece los escenarios utilizados para validar las decisiones del sistema |
-
-> **Nota de trazabilidad:** las rutas anteriores son relativas al directorio `docs/04-modelo-c4/` y corresponden a documentos existentes en el repositorio.
-
-> **Estado del documento:** este archivo representa el diseño arquitectónico propuesto. Las clases, transacciones, patrones de integración y operaciones descritas deberán implementarse y validarse en etapas posteriores del proyecto.

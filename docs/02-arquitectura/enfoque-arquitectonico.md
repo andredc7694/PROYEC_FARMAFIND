@@ -3,8 +3,6 @@
 
 ![Enfoque arquitectónico Clean Architecture de FarmaFind](../../img/enfoque-arquitectonico-farmafind.png)
 
-> **Nota:** la imagen deberá actualizarse para representar correctamente las capas de Clean Architecture, Redis como caché obligatoria, PostgreSQL como base de datos principal y Notificaciones independiente, incorporando importación de Excel, conciliación e historial de inventario y aceptación tras comprobación física.
-
 > **Estado:** diseño propuesto, pendiente de implementación y validación.
 
 ## Resumen del enfoque

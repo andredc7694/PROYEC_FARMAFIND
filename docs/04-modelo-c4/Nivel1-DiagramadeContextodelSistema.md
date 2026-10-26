@@ -22,9 +22,6 @@ FarmaFind permitirá consultar disponibilidad referencial con fecha de última a
 
 ![Diagrama de contexto de FarmaFind](../../img/nivel1-contexto-farmafind.png)
 
-
-> **Pendiente visual:** actualizar el diagrama de contexto para reflejar importación de Excel, gestión autónoma por farmacia y aceptación tras comprobación física por dueño, administrador o personal expresamente delegado; se conserva la imagen actual.
-
 ## 3. Personas (usuarios)
 
 | Persona | Descripción | Qué hace en el sistema |

@@ -234,8 +234,6 @@ El diagrama de clases deberá reflejar:
 - `NotificacionPort` como contrato de registro de eventos.
 - Los adaptadores PostgreSQL en infraestructura.
 
-> **Nota:** quedan pendientes de revisión las imágenes de paquetes, clases y secuencia de este documento para reflejar aceptación física autorizada, plazos separados, importación, conciliación e historial, manteniendo Unit of Work y Outbox. El texto de este documento constituye la especificación corregida.
-
 ---
 
 ## 5. Flujo de ejecución: crear reserva
@@ -304,8 +302,6 @@ Cuando el personal de farmacia confirme una entrega, el sistema deberá:
 Durante el MVP, el flujo principal finalizará con la creación de la reserva sin requerir pago electrónico.
 
 El módulo Pagos podrá incorporarse posteriormente mediante contratos y adaptadores independientes, sin alterar las reglas esenciales de reserva e inventario.
-
-> **Nota:** el diagrama de secuencia enlazado deberá actualizarse para representar la transacción compartida y la publicación independiente de eventos.
 
 ---
 
@@ -986,9 +982,3 @@ El módulo Pagos permanecerá desacoplado del flujo obligatorio de creación de 
 - Evaluar mecanismos adicionales de disponibilidad según los resultados de las pruebas.
 - Documentar los contratos REST mediante OpenAPI.
 - Mantener trazabilidad entre requisitos, casos de uso, componentes y pruebas.
-
----
-
-> **Nota de coherencia arquitectónica:** este documento mantiene los estados de reserva, las transiciones, el flujo transaccional de creación y el tratamiento de notificaciones definidos en `docs/04-modelo-c4/Nivel4-DiagramadeCodigo.md`, versión 1.1.
-
-> **Estado del diseño:** todas las clases, estructuras, contratos y ejemplos presentados corresponden a una propuesta de diseño. Su implementación y validación se realizarán en fases posteriores del proyecto.

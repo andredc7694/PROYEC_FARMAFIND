@@ -28,8 +28,6 @@ Este nivel permite identificar las responsabilidades principales de cada contene
 
 ![Diagrama de contenedores de FarmaFind](../../img/nivel2-contenedores-farmafind.png)
 
-> **Nota de actualización:** la imagen deberá representar los cinco contenedores obligatorios de esta versión 1.2: Aplicación web, API FarmaFind, PostgreSQL, Redis y Servicio de Notificaciones. También quedan pendientes la importación de Excel en web/API, el historial de inventario y los avisos de corrección y actualización. Se conservará el PNG actual hasta una revisión visual posterior.
-
 ### Descripción general
 
 FarmaFind utilizará una arquitectura cliente-servidor con un backend organizado como monolito modular.
@@ -394,9 +392,3 @@ El sistema deberá permitir medir:
 - Eventos pendientes y retrasos de Notificaciones.
 
 Las métricas permitirán determinar si Redis cumple su objetivo de mejorar el rendimiento sin comprometer la consistencia.
-
----
-
-> **Nota de coherencia arquitectónica:** Redis forma parte obligatoria del MVP como contenedor de caché para el módulo Búsqueda. PostgreSQL continúa siendo la fuente oficial de datos y el único almacenamiento utilizado para confirmar inventario y reservas. El flujo transaccional y Transactional Outbox mantienen coherencia con el C4 Nivel 4, versión 1.1.
-
-> **Estado del documento:** los contenedores, contratos y mecanismos descritos representan decisiones de arquitectura propuestas. Su implementación y validación se realizarán en las siguientes etapas.

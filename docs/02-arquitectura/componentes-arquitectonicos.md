@@ -3,8 +3,6 @@
 
 ![Componentes arquitectónicos de FarmaFind](../../img/componentes-arquitectonicos-farmafind.png)
 
-> **Nota:** la imagen deberá actualizarse para reflejar importación de Excel, historial y conciliación de inventario, confirmación física por personal autorizado, Redis y Notificaciones desacopladas; se conserva pendiente.
-
 > **Estado:** diseño propuesto, pendiente de implementación y validación.
 
 ## Resumen de componentes

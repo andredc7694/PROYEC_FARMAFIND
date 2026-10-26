@@ -31,8 +31,6 @@ La API FarmaFind utilizará Node.js, Express y TypeScript, siguiendo una organiz
 
 ![Diagrama de componentes de la API FarmaFind](../../img/nivel3-componentes-api-farmafind.png)
 
-> **Nota de actualización:** la imagen deberá actualizarse para representar las relaciones definidas en esta versión 1.2, especialmente la integración del módulo Búsqueda con Redis, la coordinación transaccional entre Reservas e Inventario y Outbox para Notificaciones; además, importación de Excel, asociación al catálogo, conciliación e historial y aceptación tras comprobación física autorizada. Se conserva la imagen actual.
-
 ### Descripción general
 
 La API FarmaFind se organizará como un monolito modular.
@@ -461,9 +459,3 @@ El proyecto mantendrá un monolito modular con PostgreSQL, Redis y un servicio i
 La adopción de Redis deberá validarse mediante métricas de rendimiento y uso de recursos.
 
 Las futuras extensiones, como pagos e inventario externo, respetarán los límites de los módulos y las decisiones arquitectónicas existentes.
-
----
-
-> **Nota de coherencia arquitectónica:** Redis constituye un contenedor obligatorio del MVP para mejorar las búsquedas mediante Cache-Aside. PostgreSQL conserva la responsabilidad exclusiva sobre las operaciones transaccionales de reservas e inventario. El flujo de creación de reservas y Transactional Outbox mantienen coherencia con el C4 Nivel 4, versión 1.1.
-
-> **Estado del documento:** los componentes, contratos, relaciones y patrones descritos representan decisiones de diseño propuestas. Su implementación y validación se realizarán en etapas posteriores.
