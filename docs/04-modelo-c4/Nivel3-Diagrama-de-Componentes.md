@@ -31,7 +31,7 @@ La API FarmaFind utilizará Node.js, Express y TypeScript, siguiendo una organiz
 
 ![Diagrama de componentes de la API FarmaFind](../../img/nivel3-componentes-api-farmafind.png)
 
-> **Nota de actualización:** la imagen deberá actualizarse para representar las relaciones definidas en esta versión 1.2, especialmente la integración del módulo Búsqueda con Redis, la coordinación transaccional entre Reservas e Inventario y el mecanismo Outbox para Notificaciones.
+> **Nota de actualización:** la imagen deberá actualizarse para representar las relaciones definidas en esta versión 1.2, especialmente la integración del módulo Búsqueda con Redis, la coordinación transaccional entre Reservas e Inventario y Outbox para Notificaciones; además, importación de Excel, asociación al catálogo, conciliación e historial y aceptación tras comprobación física autorizada. Se conserva la imagen actual.
 
 ### Descripción general
 
@@ -68,8 +68,8 @@ Redis no será representado como un módulo de negocio interno, sino como una de
 | **API REST** | Punto de entrada HTTP del backend | Rutas `/api/v1`, autenticación, validación de solicitudes y manejo de errores | `src/api/` |
 | **Usuarios** | Gestión de identidad y acceso | Registro, inicio de sesión, roles y permisos de clientes y administradores | `src/modules/usuarios/` |
 | **Farmacias** | Gestión de farmacias afiliadas | Registro, actualización, ubicación, estado y datos de contacto | `src/modules/farmacias/` |
-| **Medicamentos** | Gestión del catálogo general | Registro de medicamentos, nombre comercial, principio activo, presentación y datos generales | `src/modules/medicamentos/` |
-| **Inventario** | Control de existencias y precios | Gestión de stock físico, stock comprometido, disponibilidad y precios por farmacia | `src/modules/inventario/` |
+| **Medicamentos** | Gestión del catálogo general | Registro de medicamentos, nombre comercial, principio activo, concentración, presentación y asociación de productos de farmacia al catálogo para evitar duplicidades | `src/modules/medicamentos/` |
+| **Inventario** | Control de existencias y precios | Registro manual e importación obligatoria .xlsx/.csv con vista previa, validación y mapeo; stock y precios propios por farmacia, conciliación e historial movimientos_inventario | `src/modules/inventario/` |
 | **Búsqueda** | Consulta optimizada de medicamentos | Búsqueda por nombre comercial o principio activo, filtros y almacenamiento temporal de resultados mediante Redis | `src/modules/busqueda/` |
 | **Reservas** | Gestión del ciclo de vida de reservas | Crear, consultar, confirmar, cancelar, expirar y registrar entregas | `src/modules/reservas/` |
 | **Integración con Notificaciones** | Registro y publicación de eventos | Registro Outbox, publicación de eventos pendientes e integración con el servicio separado | `src/modules/notificaciones/` |
@@ -100,7 +100,7 @@ Las operaciones protegidas requerirán identidad y permisos correspondientes.
 
 ### 3.2 Componente Búsqueda
 
-El módulo Búsqueda será responsable de localizar medicamentos y farmacias, mostrando disponibilidad y precios referenciales.
+El módulo Búsqueda mostrará disponibilidad y precios referenciales y fecha de última revisión por la farmacia; la existencia física se comprobará antes de aceptar la reserva.
 
 Se diseñará siguiendo Clean Architecture y utilizará contratos para consultar Medicamentos, Farmacias e Inventario.
 
@@ -165,7 +165,7 @@ Los estados definidos serán:
 
 Los estados ENTREGADA, CANCELADA y EXPIRADA serán terminales.
 
-Las transiciones válidas estarán definidas en el modelo de dominio.
+Las transiciones válidas estarán definidas en el dominio. PENDIENTE tendrá un plazo de respuesta configurable de 20 minutos iniciales; solo el dueño, administrador o personal expresamente delegado podrá aceptarla vigente tras comprobar físicamente el producto. Al aceptar se asignará un plazo de recogida configurable de 24 horas inicialmente propuestas, sujeto a validación. Ante falta física, se cancelará PENDIENTE con motivo STOCK_FISICO_INSUFICIENTE, liberación única, incidencia, movimiento y alerta Outbox en una misma transacción.
 
 El módulo Reservas coordinará con Inventario las operaciones de compromiso, liberación y salida definitiva de stock.
 
@@ -179,9 +179,13 @@ Se distinguirán:
 
 | Concepto | Descripción |
 |---|---|
-| Stock físico | Cantidad existente en la farmacia |
+| Stock físico | Cantidad registrada por la farmacia, sujeta a discrepancias con la existencia observada |
 | Stock comprometido | Cantidad asignada temporalmente a reservas vigentes |
 | Stock disponible | Stock físico menos stock comprometido |
+
+La importación usará una plantilla propuesta de nombre, concentración, presentación, precio referencial y stock físico, sin asumir columnas uniformes. Inventario consultará el catálogo general de Medicamentos mediante contrato público para evitar duplicidades. Los ajustes e importaciones no sobrescribirán compromisos ni dejarán stock físico inferior al comprometido; exigirán conciliación y revalidación concurrente al guardar. Para el MVP, la importación será atómica por archivo: si una fila es inválida o no está conciliada, no se guardará ninguna; se presentará un reporte de errores para corregir y reintentar. El archivo completo se guardará en una única transacción.
+
+PostgreSQL conservará movimientos_inventario con producto, farmacia, cantidad anterior y nueva, motivo, responsable y fecha. La revisión de inventario por la farmacia actualizará la fecha mostrada al cliente; consultas, caché y compromisos no renovarán esa fecha.
 
 Las operaciones de compromiso de stock deberán ser atómicas.
 
@@ -201,7 +205,7 @@ La actualización de Redis no formará parte de la transacción PostgreSQL.
 
 El núcleo FarmaFind incluirá un componente de integración con Notificaciones.
 
-Este componente será responsable de registrar y publicar eventos de reserva.
+Este componente registrará y publicará eventos del ciclo de reservas, alertas de corrección y recordatorios propuestos por inventario antiguo. Los recordatorios tendrán umbral y frecuencia configurables y no alterarán existencias.
 
 No será responsable de enviar directamente los avisos finales al cliente.
 
@@ -245,7 +249,9 @@ Los estados de pago se definirán independientemente del ciclo de vida de las re
 | Reservas | Integración con Notificaciones | Solicita registrar eventos relacionados con reservas. | Contrato interno |
 | Integración con Notificaciones | Publicador Outbox | Procesa eventos persistidos pendientes. | Procesamiento interno |
 | Administración | Usuarios | Gestiona usuarios y permisos. | Contrato público del módulo |
-| Administración | Farmacias | Gestiona farmacias afiliadas. | Contrato público del módulo |
+| Administración | Farmacias | Gestionará afiliaciones y supervisión sin asumir el inventario de cada farmacia. | Contrato público del módulo |
+| Inventario | Medicamentos | Asociará productos registrados o importados al catálogo general. | Contrato público del módulo |
+| Inventario | Integración con Notificaciones | Registrará alertas de corrección y recordatorios propuestos de actualización. | Contrato interno |
 
 ### 4.1 Relación entre Búsqueda y Redis
 

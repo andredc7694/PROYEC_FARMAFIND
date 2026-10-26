@@ -23,13 +23,15 @@ El sistema utilizará PostgreSQL para la persistencia, Redis como caché obligat
 
 | Principio | Dónde se aplica (capa) | Cómo se cumple en FarmaFind | Archivos |
 |---|---|---|---|
-| **S** · Responsabilidad única | Todas las capas | Cada componente tendrá una responsabilidad: el controlador recibe solicitudes HTTP, el caso de uso coordina la reserva, la entidad valida sus reglas, el repositorio persiste los datos y Unit of Work coordina las transacciones. | `reservas.controller.ts`, `crear-reserva.use-case.ts`, `reserva.ts`, `postgres-reserva.repository.ts`, `postgres-unidad-trabajo.ts` |
+| **S** · Responsabilidad única | Todas las capas | Cada componente tendrá una responsabilidad: el controlador recibe solicitudes HTTP, el caso de uso coordina la reserva, la entidad valida sus reglas, el repositorio persiste los datos y Unit of Work coordina las transacciones. En Inventario, el adaptador leerá .xlsx/.csv y la aplicación coordinará mapeo, vista previa y validación; el dominio protegerá compromisos y conciliación. | `reservas.controller.ts`, `crear-reserva.use-case.ts`, `reserva.ts`, `postgres-reserva.repository.ts`, `postgres-unidad-trabajo.ts` |
 | **O** · Abierto/cerrado | Aplicación e infraestructura | Se podrán agregar nuevos adaptadores de infraestructura sin modificar las reglas de negocio. Por ejemplo, Búsqueda utilizará Redis mediante un puerto de caché y Notificaciones utilizará un adaptador para publicar eventos. | `busqueda-cache.port.ts`, `redis-busqueda-cache.adapter.ts`, `notificacion-port.ts`, `postgres-outbox.adapter.ts` |
 | **L** · Sustitución de Liskov | Aplicación e infraestructura | Los adaptadores que implementan un mismo contrato deberán poder sustituirse respetando su comportamiento. Por ejemplo, el adaptador Redis podrá reemplazarse por uno simulado durante las pruebas sin cambiar los casos de uso. | `busqueda-cache.port.ts`, `redis-busqueda-cache.adapter.ts`, `notificacion-port.ts` |
 | **I** · Segregación de interfaces | Aplicación y dominio | Cada contrato expondrá únicamente las operaciones necesarias. `ReservaRepository` administrará la persistencia de reservas, `InventarioPort` permitirá comprometer o liberar stock y `NotificacionPort` permitirá registrar eventos para su publicación posterior. | `reserva-repository.ts`, `inventario-port.ts`, `notificacion-port.ts`, `unidad-trabajo.ts` |
 | **D** · Inversión de dependencias | Aplicación e infraestructura | Los casos de uso dependerán de interfaces y recibirán sus dependencias mediante inyección. No conocerán directamente Express, PostgreSQL, Redis ni proveedores externos. | `crear-reserva.use-case.ts`, `reservas.module.ts`, `reserva-repository.ts`, `inventario-port.ts` |
 
 > **Nota:** los nombres de archivos TypeScript representan una estructura propuesta. No significa que estos archivos ya estén implementados.
+
+> **Pendiente visual:** revisar la imagen SOLID para incorporar responsabilidades de importación y conciliación de inventario, aceptación tras comprobación física y eventos de corrección; se conserva sin cambios.
 
 ## Qué pasaría sin SOLID en FarmaFind
 

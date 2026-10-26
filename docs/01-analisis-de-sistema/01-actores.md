@@ -1,8 +1,10 @@
 # Actores del sistema FarmaFind
 
+El diagnóstico exploratorio consultó a 20 farmacias y boticas de Huamanga. Predomina Excel, con actualizaciones usualmente semanales; la mayoría registra o descuenta ventas presenciales al cierre del día y algunos establecimientos utilizan software especializado. Se manifestó disposición a responder reservas desde computadora o celular, principalmente por el dueño o administrador. No se verificaron columnas reales de Excel ni se obtuvieron porcentajes exactos. Estas observaciones orientan el diseño propuesto del MVP.
+
 | Actor | Necesidad |
 |---|---|
-| Cliente | Necesita buscar medicamentos disponibles, conocer en qué farmacia se encuentran, revisar precio y ubicación, y realizar una reserva temporal para asegurar el medicamento antes de ir a recogerlo. |
-| Personal de farmacia | Necesita revisar las reservas realizadas por los clientes, verificar los datos de la reserva y confirmar la entrega del medicamento cuando el cliente lo recoge. |
-| Administrador de farmacia | Necesita registrar y actualizar los medicamentos de su farmacia, controlar el stock disponible, modificar precios y mantener actualizada la información que verán los clientes. |
-| Administrador de plataforma | Necesita gestionar las farmacias afiliadas, administrar usuarios, supervisar el funcionamiento general del sistema y controlar que la plataforma opere correctamente. |
+| Cliente | Necesita buscar medicamentos disponibles, conocer en qué farmacia se encuentran, revisar precio y ubicación, y realizar una reserva temporal sujeta a verificación física y aceptación de la farmacia antes de recogerlo; consultará la disponibilidad referencial y su fecha de actualización. |
+| Personal de farmacia | Necesita revisar las reservas realizadas por los clientes, verificar sus datos y registrar la entrega de reservas CONFIRMADAS vigentes. Solo podrá aceptar reservas tras comprobar existencias físicas si el dueño o administrador le delega expresamente esa autorización. |
+| Administrador de farmacia | El dueño o administrador necesita gestionar precios y existencias propios mediante registro manual e importación de Excel (.xlsx/.csv), asociar productos al catálogo general y conciliar discrepancias. Verificará físicamente el producto para aceptar reservas desde computadora o celular y podrá delegar expresamente esa autorización. |
+| Administrador de plataforma | Necesita gestionar las farmacias afiliadas, administrar usuarios, supervisar el funcionamiento general del sistema y controlar que la plataforma opere correctamente, sin asumir la actualización manual del inventario de cada establecimiento. |

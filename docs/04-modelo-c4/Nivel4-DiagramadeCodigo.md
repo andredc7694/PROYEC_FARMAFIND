@@ -25,6 +25,8 @@ El módulo **Pagos** se mantiene como una extensión futura y opcional, sin form
 
 ---
 
+> **Pendiente visual:** los diagramas de clases y secuencia deberán reflejar aceptación física autorizada, plazos separados, importación y conciliación con movimientos_inventario, y alertas Outbox. Los PNG y sus enlaces se conservan; las responsabilidades siguientes constituyen el diseño propuesto.
+
 ## 2. Diagrama de clases
 
 ### 2.1 Capas de Clean Architecture
@@ -47,6 +49,7 @@ El módulo **Pagos** se mantiene como una extensión futura y opcional, sin form
 | `ReservaController` | Controlador | Presentación | Recibe `POST /api/v1/reservas`, valida la solicitud mediante los mecanismos correspondientes y devuelve la respuesta al cliente |
 | `CrearReservaUseCase` | Caso de uso | Aplicación | Coordina la creación de la reserva y la operación transaccional con Inventario |
 | `ConsultarReservaUseCase` | Caso de uso | Aplicación | Permite consultar el estado de una reserva respetando los permisos del usuario |
+| `AceptarReservaUseCase` | Caso de uso | Aplicación | Verificará dueño, administrador o delegación expresa y comprobación física antes de aceptar PENDIENTE vigente; asignará el plazo de recogida o coordinará cancelación por falta física |
 | `ConfirmarEntregaUseCase` | Caso de uso | Aplicación | Verifica los permisos, el estado y la vigencia de la reserva antes de confirmar su entrega |
 | `ExpirarReservaUseCase` | Caso de uso | Aplicación | Gestiona el vencimiento de reservas y coordina la liberación del stock comprometido |
 | `Reserva` | Entidad | Dominio | Representa una reserva temporal y controla sus reglas y transiciones de estado |
@@ -68,16 +71,20 @@ El módulo **Pagos** se mantiene como una extensión futura y opcional, sin form
 
 | Estado inicial | Estado final | Condición |
 |---|---|---|
-| PENDIENTE | CONFIRMADA | La farmacia verifica y acepta la reserva vigente |
+| PENDIENTE | CONFIRMADA | El dueño, administrador o personal expresamente delegado comprueba físicamente el producto y acepta la reserva vigente |
 | PENDIENTE | CANCELADA | Se solicita o ejecuta una cancelación válida |
-| PENDIENTE | EXPIRADA | Se alcanza la fecha de expiración sin entrega |
+| PENDIENTE | EXPIRADA | Se agota el plazo de respuesta sin aceptación |
 | CONFIRMADA | ENTREGADA | El personal autorizado verifica la reserva vigente y confirma la entrega |
 | CONFIRMADA | CANCELADA | Se ejecuta una cancelación válida antes de la entrega |
 | CONFIRMADA | EXPIRADA | Se alcanza la fecha de expiración sin entrega |
 
 Los estados `ENTREGADA`, `CANCELADA` y `EXPIRADA` son terminales. Una reserva que alcance alguno de ellos no podrá volver a un estado anterior.
 
-La cancelación y la expiración deben liberar el stock comprometido una sola vez.
+PENDIENTE tendrá un plazo de respuesta configurable de 20 minutos iniciales desde su creación. Al aceptar, su vencimiento se sustituirá por el plazo de recogida de CONFIRMADA desde la aceptación: 24 horas como valor inicial propuesto configurable, sujeto a validación.
+
+Ante falta física se cancelará PENDIENTE con motivo STOCK_FISICO_INSUFICIENTE. Unit of Work guardará cancelación, liberación única del compromiso, incidencia, movimiento y alerta Outbox en una transacción. La corrección física requerirá conciliación respecto de los compromisos restantes; la alerta no modificará existencias.
+
+La cancelación y la expiración liberarán el stock comprometido una sola vez; la entrega descontará tanto el físico registrado como el comprometido.
 
 ---
 
@@ -90,9 +97,11 @@ La cancelación y la expiración deben liberar el stock comprometido una sola ve
 | `StockMedicamento` | Entidad | Dominio | Representa las existencias de un medicamento en una farmacia |
 | `PostgresInventarioRepository` | Repositorio | Infraestructura | Consulta y actualiza el inventario utilizando PostgreSQL |
 
-La disponibilidad se determinará considerando el stock físico y las unidades comprometidas por reservas vigentes.
+La disponibilidad digital se calculará como stock físico registrado menos unidades comprometidas. Inventario incluirá registro manual e importación obligatoria .xlsx/.csv: un adaptador leerá archivos y aplicación coordinará plantilla de nombre, concentración, presentación, precio referencial y stock físico, vista previa, validación y mapeo al catálogo general antes de confirmar, sin suponer columnas uniformes.
 
-La operación de comprometer stock deberá ser atómica y rechazar solicitudes que excedan la disponibilidad real.
+Los ajustes e importaciones revalidarán compromisos concurrentes, sin sobrescribirlos ni guardar stock físico inferior al comprometido; las discrepancias requerirán conciliación. Para el MVP, la importación será atómica por archivo: si una fila es inválida o no está conciliada, no se guardará ninguna; se presentará un reporte de errores para corregir y reintentar. El archivo completo se guardará en una única transacción. PostgreSQL conservará movimientos_inventario con producto, farmacia, cantidad anterior y nueva, motivo, responsable y fecha. Las búsquedas mostrarán fecha de última revisión por la farmacia y disponibilidad referencial.
+
+La operación de comprometer stock deberá ser atómica y rechazar solicitudes que excedan la disponibilidad digital registrada, sin garantizar existencia física hasta la aceptación.
 
 ---
 
@@ -122,7 +131,7 @@ El núcleo de FarmaFind contará con mecanismos para registrar y publicar solici
 | `RegistrarEventoReservaUseCase` | Caso de uso | Aplicación | Coordina el registro de eventos relacionados con reservas |
 | `EventoOutbox` | Modelo de persistencia | Infraestructura | Representa un evento pendiente de publicación fiable |
 
-La arquitectura contempla utilizar el patrón **Transactional Outbox** para registrar los eventos de reserva dentro de la misma transacción de PostgreSQL.
+La arquitectura contempla utilizar el patrón **Transactional Outbox** para registrar los eventos del ciclo de reservas y las alertas de corrección dentro de la misma transacción de PostgreSQL. También se propondrán recordatorios de inventario antiguo persistidos en Outbox con umbral y frecuencia configurables, sin alterar stock.
 
 El procesamiento de notificaciones se realizará de manera independiente, permitiendo reintentos y deduplicación por identificador de evento.
 
@@ -177,7 +186,7 @@ La creación de la reserva y la actualización del inventario deberán confirmar
 
 La disponibilidad deberá verificarse y actualizarse mediante un mecanismo seguro de concurrencia, como una actualización condicional atómica o un bloqueo transaccional apropiado.
 
-El sistema no deberá confirmar una reserva si la actualización del inventario o la persistencia de la reserva falla.
+El sistema no deberá dar por creada una reserva PENDIENTE si falla el compromiso de inventario, la persistencia de la reserva o el evento Outbox. Crear PENDIENTE no equivaldrá a la aceptación física CONFIRMADA.
 
 El identificador de la reserva, el registro de inventario y el evento pendiente deberán permanecer consistentes después de confirmar la transacción.
 
@@ -215,7 +224,7 @@ El identificador de la reserva, el registro de inventario y el evento pendiente 
 | RN-09 | La creación de una reserva no requiere pago electrónico durante el MVP | Mantiene independiente el proceso principal |
 | RN-10 | Los cambios de estado deben seguir únicamente las transiciones definidas | Garantiza un ciclo de vida uniforme |
 | RN-11 | La identidad del cliente debe obtenerse del contexto autenticado y no confiarse únicamente a datos enviados por el navegador | Evita operaciones en nombre de terceros |
-| RN-12 | Las reservas concurrentes no deben comprometer cantidades superiores al stock real | Garantiza consistencia ante solicitudes simultáneas |
+| RN-12 | Las reservas concurrentes no deben comprometer cantidades superiores al stock digital disponible registrado | Garantiza consistencia ante solicitudes simultáneas |
 
 ---
 

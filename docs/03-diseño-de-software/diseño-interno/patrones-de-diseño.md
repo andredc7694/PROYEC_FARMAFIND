@@ -26,7 +26,7 @@ Los patrones descritos representan **decisiones de diseño propuestas**, pendien
 - **Proyecto:** FarmaFind.
 - **Estilo arquitectónico:** monolito modular con servicio independiente de Notificaciones.
 - **Backend propuesto:** Node.js + Express + TypeScript.
-- **Frontend propuesto:** React.
+- **Frontend propuesto:** React + Vite + JavaScript/JSX.
 - **Enfoque interno:** Clean Architecture.
 - **Base de datos principal:** PostgreSQL.
 - **Caché obligatoria del MVP:** Redis.
@@ -81,6 +81,7 @@ Redis no se utilizará para confirmar reservas ni modificar inventario.
 | Adapter | Reservas → Integración con Notificaciones | Evita que las reglas de reserva dependan directamente del mecanismo de publicación de eventos. | Contratos internos y adaptadores de infraestructura. | `notificacion-port.ts`, `postgres-outbox.adapter.ts`, `notificacion-evento.adapter.ts` |
 | Adapter | Reservas/Pagos → Pasarela de pago futura | Aísla las particularidades de proveedores externos de pago. | API REST o SDK del proveedor. | `pago-port.ts`, `pasarela-pago.adapter.ts` |
 | Adapter | Búsqueda/Farmacias → Mapas | Permite cambiar el proveedor de mapas sin modificar las reglas de negocio. | API REST del proveedor de mapas. | `mapa-port.ts`, `maps.adapter.ts` |
+| Adapter | Inventario → Archivos locales .xlsx/.csv | Aísla la lectura de formatos sin suponer columnas uniformes. La aplicación coordinará mapeo, vista previa, validación y asociación al catálogo general. | Puerto interno y adaptador de lectura; importación obligatoria del MVP. | Nombres por definir durante la implementación. |
 | Adapter | Búsqueda → Redis | Evita que los casos de uso dependan directamente del cliente Redis. | Redis y contrato de caché. | `busqueda-cache.port.ts`, `redis-busqueda-cache.adapter.ts` |
 | Repository | Reservas → PostgreSQL | Separa las reglas de reserva de las consultas SQL. | PostgreSQL y repositorios. | `reserva-repository.ts`, `postgres-reserva.repository.ts` |
 | Repository | Medicamentos e Inventario → PostgreSQL | Permite consultar y actualizar medicamentos, precios y existencias sin acoplar el dominio a PostgreSQL. | PostgreSQL mediante repositorios. | `medicamento-repository.ts`, `inventario-repository.ts`, `postgres-inventario.repository.ts` |
@@ -162,7 +163,7 @@ La estrategia concreta de invalidación deberá definirse y validarse durante la
 
 ### Unit of Work en FarmaFind
 
-El patrón Unit of Work coordinará las operaciones críticas de los módulos Reservas e Inventario.
+El patrón Unit of Work coordinará las operaciones críticas de Reservas e Inventario, incluidos ajustes e importaciones confirmadas con historial movimientos_inventario. Para el MVP, la importación será atómica por archivo: si una fila es inválida o no está conciliada, no se guardará ninguna; se presentará un reporte de errores para corregir y reintentar. Se revalidarán compromisos concurrentes sin sobrescribirlos ni guardar stock físico inferior al comprometido; las discrepancias exigirán conciliación.
 
 La creación de una reserva deberá ejecutar:
 
@@ -182,13 +183,15 @@ Esto permitirá evitar:
 - Stock comprometido sin una reserva registrada.
 - Reservas registradas sin stock comprometido.
 - Eventos de notificación asociados a reservas que no se confirmaron.
-- Reservas concurrentes que superen la disponibilidad real.
+- Reservas concurrentes que superen la disponibilidad digital registrada; la existencia física se comprobará antes de aceptar.
 
 La transacción se mantendrá dentro de PostgreSQL y no incluirá llamadas externas a Redis, Notificaciones o proveedores de pago.
 
 ### Transactional Outbox en FarmaFind
 
 Transactional Outbox permitirá mantener la consistencia entre las operaciones de negocio y el registro de eventos pendientes.
+
+Los eventos cubrirán el ciclo de reservas, las alertas por STOCK_FISICO_INSUFICIENTE y los recordatorios propuestos por inventario antiguo. La cancelación por falta física guardará estado, liberación única, incidencia, movimiento y alerta en una misma transacción. Los recordatorios tendrán umbral y frecuencia configurables y no alterarán existencias.
 
 Cuando se cree una reserva:
 
