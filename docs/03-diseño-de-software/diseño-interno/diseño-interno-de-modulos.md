@@ -14,7 +14,7 @@
 
 ## 1. Propósito
 
-Este documento describe cómo se organizará el código dentro de un módulo del backend de FarmaFind. Se toma como referencia el módulo **Reservas**, porque representa uno de los procesos más importantes del sistema: asegurar temporalmente un medicamento disponible para que el cliente pueda recogerlo en una farmacia.
+Este documento describe cómo se organizará el código dentro de un módulo del backend de FarmaFind. Se toma como referencia el módulo **Reservas**, porque representa uno de los procesos más importantes del sistema: solicitar temporalmente un medicamento con disponibilidad digital, sujeto a comprobación física para que el cliente pueda recogerlo en una farmacia.
 
 El objetivo de este diseño interno es:
 
@@ -52,6 +52,7 @@ src/
         ├── aplicacion/
         │   ├── crear-reserva.use-case.ts
         │   ├── consultar-reserva.use-case.ts
+        │   ├── aceptar-reserva.use-case.ts
         │   ├── confirmar-entrega.use-case.ts
         │   ├── cancelar-reserva.use-case.ts
         │   ├── expirar-reserva.use-case.ts
@@ -85,6 +86,7 @@ La carpeta `shared/transacciones/` representa contratos técnicos compartidos qu
 | `notificacion-port.ts` | Dominio | Declara el contrato para registrar eventos de notificación relacionados con reservas. | Contratos de transacción |
 | `crear-reserva.use-case.ts` | Aplicación | Coordina la creación transaccional de una reserva. | Dominio y abstracciones compartidas |
 | `consultar-reserva.use-case.ts` | Aplicación | Consulta el estado de una reserva y verifica permisos de acceso. | Dominio |
+| `aceptar-reserva.use-case.ts` | Aplicación | Verificará dueño, administrador o delegación expresa y comprobación física; coordinará aceptación o cancelación por falta física. | Dominio y puertos necesarios |
 | `confirmar-entrega.use-case.ts` | Aplicación | Confirma la entrega de una reserva vigente y autorizada. | Dominio y puertos necesarios |
 | `cancelar-reserva.use-case.ts` | Aplicación | Gestiona la cancelación y liberación del stock comprometido. | Dominio y puertos necesarios |
 | `expirar-reserva.use-case.ts` | Aplicación | Gestiona el vencimiento de reservas y la liberación segura del stock. | Dominio y puertos necesarios |
@@ -202,14 +204,18 @@ Los estados `ENTREGADA`, `CANCELADA` y `EXPIRADA` serán terminales.
 
 | Estado inicial | Estado final | Condición |
 |---|---|---|
-| PENDIENTE | CONFIRMADA | La farmacia acepta una reserva vigente. |
+| PENDIENTE | CONFIRMADA | El dueño, administrador o personal expresamente delegado comprueba físicamente el producto y acepta la reserva vigente. |
 | PENDIENTE | CANCELADA | Se realiza una cancelación autorizada. |
-| PENDIENTE | EXPIRADA | Se alcanza la fecha límite sin entrega. |
+| PENDIENTE | EXPIRADA | Se agota el plazo de respuesta sin aceptación. |
 | CONFIRMADA | ENTREGADA | Se confirma la entrega de una reserva vigente. |
 | CONFIRMADA | CANCELADA | Se realiza una cancelación autorizada antes de la entrega. |
 | CONFIRMADA | EXPIRADA | Se alcanza la fecha límite sin entrega. |
 
 No se permitirá regresar desde un estado terminal hacia uno anterior.
+
+PENDIENTE tendrá un plazo de respuesta configurable de 20 minutos iniciales desde su creación. Al aceptar, se sustituirá ese vencimiento por el plazo de recogida de CONFIRMADA desde la aceptación: 24 horas como valor inicial propuesto configurable, sujeto a validación.
+
+Si falta existencia física, se cancelará PENDIENTE con motivo STOCK_FISICO_INSUFICIENTE. Unit of Work coordinará estado, liberación única del compromiso, incidencia, movimiento y alerta Outbox en una transacción; después del commit se invalidará caché. La corrección del stock físico requerirá conciliación, sin reducirlo por debajo de otros compromisos vigentes.
 
 La transición hacia CANCELADA o EXPIRADA deberá coordinarse con la liberación del stock comprometido.
 
@@ -227,8 +233,6 @@ El diagrama de clases deberá reflejar:
 - `UnidadTrabajo` como abstracción para la transacción compartida.
 - `NotificacionPort` como contrato de registro de eventos.
 - Los adaptadores PostgreSQL en infraestructura.
-
-> **Nota:** la imagen enlazada deberá actualizarse si todavía representa los estados, clases o relaciones anteriores. El texto de este documento constituye la especificación corregida.
 
 ---
 
@@ -299,8 +303,6 @@ Durante el MVP, el flujo principal finalizará con la creación de la reserva si
 
 El módulo Pagos podrá incorporarse posteriormente mediante contratos y adaptadores independientes, sin alterar las reglas esenciales de reserva e inventario.
 
-> **Nota:** el diagrama de secuencia enlazado deberá actualizarse para representar la transacción compartida y la publicación independiente de eventos.
-
 ---
 
 ## 6. Reglas internas del módulo Reservas
@@ -313,7 +315,7 @@ El módulo Pagos podrá incorporarse posteriormente mediante contratos y adaptad
 | RN-04 | Si una reserva expira, el stock comprometido debe liberarse una sola vez. |
 | RN-05 | Solo el personal autorizado de la farmacia correspondiente puede confirmar la entrega. |
 | RN-06 | Una reserva entregada, cancelada o expirada no puede regresar a un estado anterior. |
-| RN-07 | El sistema debe evitar que las reservas concurrentes comprometan más unidades que el stock real. |
+| RN-07 | El sistema debe evitar que las reservas concurrentes comprometan más unidades que el stock digital disponible registrado. |
 | RN-08 | La creación de la reserva, el compromiso del stock y el registro del evento pendiente deben realizarse dentro de una única transacción. |
 | RN-09 | El envío de notificaciones no debe impedir el funcionamiento de las reservas. |
 | RN-10 | Las transiciones de estado deben respetar el ciclo de vida definido para la entidad Reserva. |
@@ -322,7 +324,7 @@ El módulo Pagos podrá incorporarse posteriormente mediante contratos y adaptad
 
 ### Criterios adicionales de consistencia
 
-- El stock comprometido no puede superar las existencias físicas disponibles.
+- El stock comprometido no podrá superar el stock físico registrado; la existencia observada se comprobará antes de aceptar la reserva.
 - La creación de una reserva no debe finalizar exitosamente si falla su persistencia.
 - Una cancelación o expiración no puede devolver más unidades de las comprometidas.
 - La entrega convierte las unidades comprometidas en una salida definitiva del inventario.
@@ -368,7 +370,7 @@ export class Reserva {
     readonly farmaciaId: string,
     readonly cantidad: number,
     private estado: EstadoReserva,
-    readonly fechaExpiracion: Date,
+    public fechaExpiracion: Date,
   ) {}
 
   static crear(
@@ -418,7 +420,7 @@ export class Reserva {
     return ahora.getTime() < this.fechaExpiracion.getTime();
   }
 
-  confirmar(ahora: Date): void {
+  confirmar(ahora: Date, fechaLimiteRecogida: Date): void {
     if (this.estado !== EstadoReserva.PENDIENTE) {
       throw new Error(
         'Solo una reserva pendiente puede confirmarse.'
@@ -429,6 +431,14 @@ export class Reserva {
       throw new Error('La reserva ya venció.');
     }
 
+    if (
+      Number.isNaN(fechaLimiteRecogida.getTime()) ||
+      fechaLimiteRecogida.getTime() <= ahora.getTime()
+    ) {
+      throw new Error('El plazo de recogida debe ser futuro.');
+    }
+
+    this.fechaExpiracion = fechaLimiteRecogida;
     this.estado = EstadoReserva.CONFIRMADA;
   }
 
@@ -482,7 +492,7 @@ La entidad controla las transiciones de estado, pero no ejecuta consultas SQL ni
 
 Las operaciones que afecten inventario deberán coordinarse desde los casos de uso y confirmarse mediante transacciones.
 
-La autorización del trabajador o cliente deberá validarse en la capa de aplicación antes de modificar una reserva.
+La autorización del trabajador o cliente deberá validarse en aplicación antes de modificar una reserva. Para aceptar, el caso de uso comprobará que actúa el dueño, administrador o personal expresamente delegado y registrará la comprobación física; calculará fechaLimiteRecogida según la configuración, sin recibirla libremente del navegador.
 
 #### Contexto transaccional
 
@@ -624,7 +634,7 @@ export interface CrearReservaCommand {
 
 El identificador del cliente deberá provenir de la identidad autenticada.
 
-La fecha de expiración será calculada por el sistema conforme a una duración de reserva configurada, evitando que el cliente establezca libremente su vencimiento.
+La fecha de expiración inicial se calculará con el plazo de respuesta PENDIENTE (20 minutos configurables). En el ejemplo, duracionReservaMs representará ese plazo, distinto del de recogida CONFIRMADA. El cliente no establecerá libremente los vencimientos.
 
 #### Caso de uso CrearReserva
 
@@ -926,13 +936,19 @@ Las operaciones protegidas deberán contar con controles de autenticación y aut
 |---|---|
 | Usuarios | Gestiona clientes, personal de farmacia y administradores, incluyendo identidad y permisos. |
 | Farmacias | Administra farmacias afiliadas, ubicación, estado y datos de contacto. |
-| Medicamentos | Gestiona el catálogo de medicamentos, nombre comercial, principio activo y presentación. |
-| Inventario | Controla existencias, unidades comprometidas y precios por farmacia. |
+| Medicamentos | Gestionará el catálogo general, nombre comercial, principio activo, concentración y presentación; los productos de cada farmacia se asociarán a él para evitar duplicidades. |
+| Inventario | Propondrá registro manual e importación obligatoria .xlsx/.csv, precios y stock propios por farmacia, conciliación e historial movimientos_inventario. |
 | Búsqueda | Permite buscar medicamentos y ordenar resultados por disponibilidad, precio o cercanía. |
 | Reservas | Permite crear, consultar, confirmar, cancelar y expirar reservas, manteniendo la consistencia del inventario. |
 | Notificaciones | En el núcleo registra eventos; el servicio separado procesa los avisos relacionados con reservas. |
 | Pagos | Contempla el pago opcional mediante una pasarela externa para una futura iteración. |
-| Administración | Gestiona farmacias afiliadas, usuarios y funciones generales de la plataforma. |
+| Administración | Gestionará farmacias, usuarios y supervisión; no asumirá la actualización del inventario de cada establecimiento. |
+
+La importación de Inventario utilizará una plantilla propuesta con nombre del medicamento, concentración, presentación, precio referencial y stock físico. Un adaptador leerá .xlsx/.csv; aplicación permitirá vista previa, validación y mapeo de columnas sin asumir una estructura uniforme. Para el MVP, la importación será atómica por archivo: si una fila es inválida o no está conciliada, no se guardará ninguna; se presentará un reporte de errores para corregir y reintentar. El archivo completo se guardará mediante Unit of Work en una única transacción tras revalidar compromisos concurrentes.
+
+Los ajustes e importaciones no sobrescribirán compromisos ni dejarán stock físico registrado inferior al comprometido. La conciliación resolverá las reservas afectadas mediante transiciones válidas antes de guardar la corrección. PostgreSQL conservará movimientos_inventario con producto, farmacia, cantidad anterior y nueva, motivo, responsable y fecha; se propone registrar valores anteriores y nuevos de stock físico y comprometido cuando corresponda.
+
+La fecha de última revisión por la farmacia acompañará la disponibilidad referencial y no se renovará al consultar, recargar Redis o comprometer unidades. Los recordatorios propuestos por inventario antiguo se registrarán en Outbox con umbral y frecuencia configurables; no modificarán existencias automáticamente.
 
 ### Relación entre módulos
 
@@ -960,15 +976,9 @@ El módulo Pagos permanecerá desacoplado del flujo obligatorio de creación de 
 ### Consideraciones para futuras iteraciones
 
 - Incorporar integración con inventarios externos cuando se definan sus contratos.
-- Evaluar Redis cuando exista evidencia de necesidad de caché.
+- Validar el rendimiento de Redis, obligatorio en el MVP, mediante mediciones con y sin caché.
 - Incorporar pagos electrónicos únicamente después de definir sus reglas y estados.
 - Implementar monitoreo y pruebas para validar los atributos de calidad.
 - Evaluar mecanismos adicionales de disponibilidad según los resultados de las pruebas.
 - Documentar los contratos REST mediante OpenAPI.
 - Mantener trazabilidad entre requisitos, casos de uso, componentes y pruebas.
-
----
-
-> **Nota de coherencia arquitectónica:** este documento mantiene los estados de reserva, las transiciones, el flujo transaccional de creación y el tratamiento de notificaciones definidos en `docs/04-modelo-c4/Nivel4-DiagramadeCodigo.md`, versión 1.1.
-
-> **Estado del diseño:** todas las clases, estructuras, contratos y ejemplos presentados corresponden a una propuesta de diseño. Su implementación y validación se realizarán en fases posteriores del proyecto.

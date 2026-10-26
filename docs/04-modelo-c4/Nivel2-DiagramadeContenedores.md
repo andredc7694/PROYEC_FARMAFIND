@@ -28,8 +28,6 @@ Este nivel permite identificar las responsabilidades principales de cada contene
 
 ![Diagrama de contenedores de FarmaFind](../../img/nivel2-contenedores-farmafind.png)
 
-> **Nota de actualización:** la imagen deberá representar los cinco contenedores obligatorios de esta versión 1.2: Aplicación web, API FarmaFind, PostgreSQL, Redis y Servicio de Notificaciones. El diagrama PNG deberá actualizarse antes de considerar terminada la documentación visual.
-
 ### Descripción general
 
 FarmaFind utilizará una arquitectura cliente-servidor con un backend organizado como monolito modular.
@@ -70,7 +68,7 @@ Redis no será utilizado como fuente oficial de inventario ni como mecanismo de 
 
 | Contenedor | Tecnología | Responsabilidad | Datos que maneja |
 |---|---|---|---|
-| **Aplicación web** | SPA · React | Interfaz para clientes, personal de farmacia, administradores de farmacia y administrador de plataforma. | Estado temporal de pantalla, formularios, filtros y sesión del usuario. |
+| **Aplicación web** | SPA · React + Vite + JavaScript/JSX | Interfaz para clientes, personal de farmacia, administradores de farmacia y administrador de plataforma. | Estado temporal de pantalla, formularios, filtros y sesión del usuario. |
 | **API FarmaFind** | Node.js + Express + TypeScript | Expone la API REST, aplica las reglas de negocio y coordina los módulos internos del monolito modular. | Procesa solicitudes y utiliza PostgreSQL, Redis e integraciones externas. |
 | **Servicio de Notificaciones** | Node.js + worker/API interna | Procesa eventos de reserva, administra avisos, reintentos y deduplicación. | Identificadores de eventos, trabajos de notificación y resultados de envío. |
 | **Base de datos** | PostgreSQL | Almacena la información persistente y permite operaciones transaccionales. | Usuarios, farmacias, medicamentos, inventario, reservas, roles, auditoría básica y eventos Outbox. |
@@ -83,11 +81,11 @@ La aplicación web será el punto de interacción de los usuarios con FarmaFind.
 Permitirá:
 
 - Buscar medicamentos por nombre comercial o principio activo.
-- Consultar farmacias, precios referenciales y disponibilidad.
+- Consultar farmacias, precios y disponibilidad referenciales con fecha de última revisión del inventario; la existencia física se comprobará al aceptar la reserva.
 - Filtrar resultados por precio, disponibilidad o cercanía.
 - Crear y consultar reservas.
 - Gestionar reservas desde perfiles autorizados.
-- Administrar inventario y precios.
+- Administrar precios e inventario propios con registro manual e importación obligatoria .xlsx/.csv: plantilla propuesta de nombre, concentración, presentación, precio referencial y stock físico; vista previa, validación y mapeo al catálogo general antes de confirmar.
 - Acceder a funciones administrativas según el rol.
 
 Las búsquedas públicas podrán realizarse sin iniciar sesión.
@@ -123,7 +121,7 @@ El servicio de Notificaciones se ejecutará independientemente del núcleo Farma
 
 Será responsable de:
 
-- Recibir eventos relacionados con reservas.
+- Recibir eventos del ciclo de reservas, alertas de corrección y recordatorios propuestos por inventario antiguo; estos últimos tendrán umbral y frecuencia configurables y no modificarán existencias.
 - Registrar trabajos de notificación.
 - Procesar avisos.
 - Administrar estados de procesamiento.
@@ -139,7 +137,7 @@ El núcleo almacenará eventos pendientes mediante Transactional Outbox.
 
 PostgreSQL será la fuente oficial de información del sistema.
 
-Almacenará usuarios, farmacias, medicamentos, inventario, reservas y eventos pendientes.
+Almacenará usuarios, farmacias, catálogo general, inventario por farmacia, movimientos_inventario, reservas y eventos pendientes. El historial incluirá producto, farmacia, cantidad anterior y nueva, motivo, responsable y fecha. Ajustes e importaciones no sobrescribirán compromisos ni guardarán stock físico inferior al comprometido; exigirán conciliación y revalidación de concurrencia antes del commit. Para el MVP, la importación será atómica por archivo: si una fila es inválida o no está conciliada, no se guardará ninguna; se presentará un reporte de errores para corregir y reintentar.
 
 La creación de una reserva deberá confirmar conjuntamente:
 
@@ -147,7 +145,7 @@ La creación de una reserva deberá confirmar conjuntamente:
 2. La creación de la reserva con estado PENDIENTE.
 3. El registro del evento de reserva creada en Outbox.
 
-Las operaciones deberán ejecutarse dentro de una misma transacción.
+Las operaciones deberán ejecutarse en una misma transacción mediante Unit of Work. PENDIENTE tendrá 20 minutos configurables de respuesta. Al aceptar tras comprobación física, se asignará a CONFIRMADA un plazo de recogida configurable de 24 horas propuestas, sujeto a validación. Ante falta física se cancelará PENDIENTE con STOCK_FISICO_INSUFICIENTE, guardando liberación única, incidencia, movimiento y alerta Outbox transaccionalmente.
 
 Redis no participará en estas transacciones.
 
@@ -244,7 +242,7 @@ Las claves de caché deberán considerar los parámetros de búsqueda, filtros, 
 
 Las modificaciones relevantes deberán activar mecanismos de invalidación.
 
-El sistema deberá considerar que los resultados de búsqueda representan disponibilidad referencial, sujeta a validación al momento de reservar.
+El sistema deberá considerar que los resultados de búsqueda representan disponibilidad referencial, sujeta a validación digital en PostgreSQL al solicitar PENDIENTE y comprobación física por la farmacia antes de CONFIRMADA.
 
 ### 4.3 Comunicación con Notificaciones
 
@@ -322,7 +320,8 @@ La persistencia de eventos dentro de PostgreSQL permitirá mantener los trabajos
 | Tamaño de caché | Definir límites de memoria y política de expulsión. |
 | Proveedor de mapas | Pendiente de selección. |
 | Canal de notificaciones | Pendiente de selección. |
-| Política de expiración de reservas | Pendiente de establecer duración y periodicidad de ejecución. |
+| Política de expiración de reservas | Validar plazos configurables: respuesta PENDIENTE de 20 minutos iniciales y recogida CONFIRMADA de 24 horas propuestas desde la aceptación. Definir periodicidad configurable del proceso de expiración. |
+| Importación e inventario antiguo | Validar columnas reales; la importación será atómica por archivo con reporte de errores; definir umbral y frecuencia configurables de recordatorios. |
 | Pasarela de pago | Funcionalidad futura. |
 | Integración de inventario externo | Funcionalidad futura. |
 
@@ -363,7 +362,7 @@ Las operaciones de reservas requerirán autenticación.
 
 La identidad del cliente provendrá del contexto autenticado y no únicamente del cuerpo de la solicitud.
 
-Los permisos del personal de farmacia deberán verificarse antes de consultar reservas protegidas o confirmar entregas.
+Se verificarán permisos por farmacia para consultar y entregar. La aceptación de PENDIENTE vigente corresponderá al dueño o administrador o al personal con delegación expresa, tras comprobar existencias físicas. FarmaFind supervisará sin actualizar el inventario de todos los establecimientos.
 
 Las transacciones PostgreSQL deberán impedir comprometer más unidades que las disponibles.
 
@@ -393,9 +392,3 @@ El sistema deberá permitir medir:
 - Eventos pendientes y retrasos de Notificaciones.
 
 Las métricas permitirán determinar si Redis cumple su objetivo de mejorar el rendimiento sin comprometer la consistencia.
-
----
-
-> **Nota de coherencia arquitectónica:** Redis forma parte obligatoria del MVP como contenedor de caché para el módulo Búsqueda. PostgreSQL continúa siendo la fuente oficial de datos y el único almacenamiento utilizado para confirmar inventario y reservas. El flujo transaccional y Transactional Outbox mantienen coherencia con el C4 Nivel 4, versión 1.1.
-
-> **Estado del documento:** los contenedores, contratos y mecanismos descritos representan decisiones de arquitectura propuestas. Su implementación y validación se realizarán en las siguientes etapas.
