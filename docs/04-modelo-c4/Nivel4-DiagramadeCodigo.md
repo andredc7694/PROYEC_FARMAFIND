@@ -25,7 +25,7 @@ El módulo **Pagos** se mantiene como una extensión futura y opcional, sin form
 
 ---
 
-> **Pendiente visual:** los diagramas de clases y secuencia deberán reflejar aceptación física autorizada, plazos separados, importación y conciliación con movimientos_inventario, y alertas Outbox. Los PNG y sus enlaces se conservan; las responsabilidades siguientes constituyen el diseño propuesto.
+> **Representación visual:** los diagramas de clases y secuencia complementan el diseño propuesto del módulo Reservas, incluyendo la validación física, las transiciones de estado, la coordinación con Inventario y los eventos mediante Transactional Outbox.
 
 ## 2. Diagrama de clases
 
